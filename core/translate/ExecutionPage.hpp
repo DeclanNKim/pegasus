@@ -3,6 +3,8 @@
 #include <cinttypes>
 #include <vector>
 #include <map>
+#include <memory>
+#include <unordered_map>
 
 #include "core/ActionGroup.hpp"
 #include "core/PegasusInst.hpp"
@@ -75,15 +77,8 @@ namespace pegasus
                                                                            ActionTags::TRANSLATION_PAGE_EXECUTE)),
             fetch_action_group_(fetch_action_group),
             execute_action_group_(execute_action_group),
-            default_block_(2048, InstExecute(&translated_page_group_, execute_action_group_)),
             translation_result_(translation_result)
         {
-            // Get the inst execute block at the end of the block.
-            // This instruction execute class represents a potential
-            // page crosser
-            auto & last_inst_exe = default_block_.back();
-            last_inst_exe = InstExecute(&translated_page_group_,
-                                        execute_action_group_, true);
         }
 
         ActionGroup * getExecutionPageActionGroup() { return &translated_page_group_; }
@@ -175,12 +170,9 @@ namespace pegasus
         ActionGroup * fetch_action_group_ = nullptr;
         ActionGroup * execute_action_group_ = nullptr;
 
-        using InstExecuteBlock = std::vector<InstExecute>;
+        static constexpr size_t kInstsPer4KPage = 2048;
+        using InstExecuteBlock = std::vector<std::unique_ptr<InstExecute>>;
         std::unordered_map<Addr, InstExecuteBlock> decode_block_;
-
-        // To prevent a construction EVERY TIME the map is queried,
-        // cache a copy-able block
-        InstExecuteBlock default_block_;
 
         const PegasusTranslationState::TranslationResult translation_result_;
     };

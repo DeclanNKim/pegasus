@@ -95,9 +95,24 @@ namespace pegasus
             // is never set (and we can save some vector space)
             const auto offset = (vaddr & 0xfffull) >> 1;
 
-            auto inst_execute_pair = decode_block_.try_emplace(addr_idx, default_block_).first;
+            auto [inst_execute_it, inserted] = decode_block_.try_emplace(addr_idx);
+            auto & inst_execute_block = inst_execute_it->second;
+            if (inserted)
+            {
+                // if the insertion into the decode_block_ map was successful, resize the newly created block to hold kInstsPer4KPage entries.
+                inst_execute_block.resize(kInstsPer4KPage);
+            }
 
-            auto & inst_execute = inst_execute_pair->second.at(offset);
+            auto & inst_execute_ptr = inst_execute_block.at(offset);
+            if (SPARTA_EXPECT_FALSE(inst_execute_ptr == nullptr))
+            {
+                const bool last_entry = (offset == (kInstsPer4KPage - 1));
+                inst_execute_ptr = std::make_unique<InstExecute>(&translated_page_group_,
+                                                                 execute_action_group_,
+                                                                 last_entry);
+            }
+
+            auto & inst_execute = *inst_execute_ptr;
 
             // Logging stuff
             // For logging purposes, check if the inst has been decoded before (already set up)

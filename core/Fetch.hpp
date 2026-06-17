@@ -7,7 +7,7 @@
 #include "sparta/simulation/TreeNode.hpp"
 #include "sparta/simulation/Unit.hpp"
 
-#include <map>
+#include <unordered_map>
 #include <memory>
 #include <tuple>
 
@@ -44,11 +44,25 @@ namespace pegasus
         const bool enable_execution_cache_ = false;
         ActionGroup* execute_action_group_ = nullptr;
 
-        // ExecutionPageKey is a tuple of (virt_page_base_addr, phys_page_base_addr, page_offset)
+        // ExecutionPageKey is a tuple of (virt_page_base_addr, phys_page_base_addr, page_size)
         // It allows us to identify an execution page
         using ExecutionPageKey = std::tuple<Addr, Addr, Addr>;
+
+        struct ExecutionPageKeyHash
+        {
+            size_t operator()(const ExecutionPageKey & k) const noexcept
+            {
+                // FNV-style hash combine over the three Addr fields
+                size_t h = std::get<0>(k);
+                h ^= std::get<1>(k) + 0x9e3779b97f4a7c15ull + (h << 6) + (h >> 2);
+                h ^= std::get<2>(k) + 0x9e3779b97f4a7c15ull + (h << 6) + (h >> 2);
+                return h;
+            }
+        };
+
         // The actual map of execution pages, keyed by the above tuple
-        std::map<ExecutionPageKey, std::unique_ptr<ExecutionPage>> execution_pages_;
+        std::unordered_map<ExecutionPageKey, std::unique_ptr<ExecutionPage>, ExecutionPageKeyHash>
+            execution_pages_;
 
         void onBindTreeEarly_() override;
 
